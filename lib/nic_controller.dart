@@ -49,7 +49,13 @@ class NicController extends GetxController {
   }
 
   void _processCommon(int year, int dayOfYear) {
-    gender.value = dayOfYear < 500 ? 'Male' : 'Female';
+    gender.value = dayOfYear > 500 ? 'Female' : 'Male';
+
+    // Adjust dayOfYear for females
+    if (dayOfYear > 500) {
+      dayOfYear -= 500;
+    }
+
     DateTime? date = _calculateBirthDate(year, dayOfYear);
     if (date != null) {
       birthDate.value = DateFormat('yyyy-MM-dd').format(date);
@@ -62,6 +68,7 @@ class NicController extends GetxController {
 
   DateTime? _calculateBirthDate(int year, int dayOfYear) {
     try {
+      // Adjust to prevent off-by-one errors
       final date = DateTime(year, 1, 1).add(Duration(days: dayOfYear - 1));
       return date.year == year ? date : null;
     } catch (e) {
