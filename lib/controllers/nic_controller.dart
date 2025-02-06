@@ -10,49 +10,20 @@ class NicController extends GetxController {
   final weekDay = ''.obs;
   final age = 0.obs;
   final canVote = ''.obs;
-  final province = ''.obs;
+  final serialNumber = ''.obs;
 
   void decodeNIC(String nic) {
     try {
       nicNumber.value = nic.trim().toUpperCase();
+      
+      // Validate NIC format
+      if (!_isValidNICFormat(nic)) {
+        throw Exception('Invalid NIC format');
+      }
+      
       isOldFormat.value = nic.length == 10;
-
-      int year;
-      int dayOfYear;
-
-      if (isOldFormat.value) {
-        // Old format (e.g., 911042754V)
-        int yearPrefix = int.parse(nic.substring(0, 2));
-        year = yearPrefix >= 0 && yearPrefix <= 30 ? 2000 + yearPrefix : 1900 + yearPrefix;
-        dayOfYear = int.parse(nic.substring(2, 5));
-        
-        // Check voting eligibility (last letter)
-        String lastLetter = nic[9].toUpperCase();
-        canVote.value = lastLetter == 'V' ? 'Can Vote' : 'Cannot Vote';
-      } else {
-        // New format (e.g., 200668803138)
-        year = int.parse(nic.substring(0, 4));
-        dayOfYear = int.parse(nic.substring(4, 7));
-        canVote.value = 'Information not available';
-      }
-
-      // Gender determination
-      gender.value = dayOfYear > 500 ? 'Female' : 'Male';
-
-      // Adjust day for females
-      if (dayOfYear > 500) {
-        dayOfYear -= 500;
-      }
-
-      if (!_isValidDayOfYear(year, dayOfYear)) {
-        throw Exception('Invalid day of year');
-      }
-
-      DateTime birthDate = _calculateDateFromDayOfYear(year, dayOfYear);
-      dateOfBirth.value = birthDate;
-      weekDay.value = DateFormat('EEEE').format(birthDate);
-      _calculateAge(birthDate);
-
+      _processNIC(nic);
+      
     } catch (e) {
       print('Error processing NIC: $e');
       Get.snackbar(
@@ -64,65 +35,57 @@ class NicController extends GetxController {
     }
   }
 
+  bool _isValidNICFormat(String nic) {
+    if (nic.length == 10) {
+      // Old format validation: 9 digits + V/X
+      return RegExp(r'^\d{9}[VvXx]$').hasMatch(nic);
+    } else if (nic.length == 12) {
+      // New format validation: 12 digits
+      return RegExp(r'^\d{12}$').hasMatch(nic);
+    }
+    return false;
+  }
+
+  void _processNIC(String nic) {
+    int year;
+    int dayOfYear;
+    
+    if (isOldFormat.value) {
+      // Process old format (e.g., 853400937V)
+      year = 1900 + int.parse(nic.substring(0, 2));
+      dayOfYear = int.parse(nic.substring(2, 5));
+      serialNumber.value = nic.substring(5, 9);
+      canVote.value = nic[9].toUpperCase() == 'V' ? 'Can Vote' : 'Cannot Vote';
+    } else {
+      // Process new format (e.g., 198534000937)
+      year = int.parse(nic.substring(0, 4));
+      dayOfYear = int.parse(nic.substring(4, 7));
+      serialNumber.value = nic.substring(7, 11);
+      canVote.value = 'Not Applicable';
+    }
+
+    // Gender determination
+    gender.value = dayOfYear > 500 ? 'Female' : 'Male';
+    
+    // Adjust day for females
+    if (dayOfYear > 500) {
+      dayOfYear -= 500;
+    }
+
+    // Calculate birth date
+    DateTime birthDate = _calculateDateFromDayOfYear(year, dayOfYear);
+    dateOfBirth.value = birthDate;
+    weekDay.value = DateFormat('EEEE').format(birthDate);
+    _calculateAge(birthDate);
+  }
+
   DateTime _calculateDateFromDayOfYear(int year, int dayOfYear) {
-    // Handle edge cases
-    if (dayOfYear < 1) {
-      throw Exception('Day of year cannot be less than 1');
+    if (dayOfYear < 1 || dayOfYear > (_isLeapYear(year) ? 366 : 365)) {
+      throw Exception('Invalid day of year');
     }
 
-    // Define cumulative days for each month (non-leap year)
-    final List<int> monthDays = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334, 365];
-    
-    // Adjust February for leap year
-    if (_isLeapYear(year)) {
-      for (int i = 2; i < monthDays.length; i++) {
-        monthDays[i]++;
-      }
-    }
-
-    // Find the month
-    int month = 1;
-    for (int i = 0; i < monthDays.length - 1; i++) {
-      if (dayOfYear > monthDays[i] && dayOfYear <= monthDays[i + 1]) {
-        month = i + 1;
-        break;
-      }
-    }
-
-    // Calculate the day
-    int day = dayOfYear - monthDays[month - 1];
-
-    try {
-      DateTime result = DateTime(year, month, day);
-      
-      // Verify the calculation
-      if (_getDayOfYear(result) != dayOfYear) {
-        throw Exception('Date calculation error');
-      }
-      
-      return result;
-    } catch (e) {
-      throw Exception('Invalid date: Year: $year, Month: $month, Day: $day');
-    }
-  }
-
-  int _getDayOfYear(DateTime date) {
-    // Define cumulative days for each month (non-leap year)
-    final List<int> monthDays = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
-    
-    int dayOfYear = monthDays[date.month - 1] + date.day;
-    
-    // Add leap day if it's a leap year and after February
-    if (_isLeapYear(date.year) && date.month > 2) {
-      dayOfYear++;
-    }
-    
-    return dayOfYear;
-  }
-
-  bool _isValidDayOfYear(int year, int dayOfYear) {
-    int maxDays = _isLeapYear(year) ? 366 : 365;
-    return dayOfYear >= 1 && dayOfYear <= maxDays;
+    DateTime date = DateTime(year, 1, 1);
+    return date.add(Duration(days: dayOfYear - 1));
   }
 
   bool _isLeapYear(int year) {

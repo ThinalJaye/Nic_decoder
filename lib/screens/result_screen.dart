@@ -76,7 +76,7 @@ class ResultScreen extends StatelessWidget {
               children: [
                 _buildInfoCard(
                   'NIC Format',
-                  controller.isOldFormat.value ? "Old Format" : "New Format",
+                  controller.isOldFormat.value ? "Old Format (9 digits + letter)" : "New Format (12 digits)",
                   Icons.credit_card,
                 ),
                 SizedBox(height: 10),
@@ -102,6 +102,12 @@ class ResultScreen extends StatelessWidget {
                   'Gender',
                   controller.gender.value,
                   Icons.wc,
+                ),
+                SizedBox(height: 10),
+                _buildInfoCard(
+                  'Voting Eligibility',
+                  controller.canVote.value,
+                  Icons.how_to_vote,
                 ),
                 SizedBox(height: 20),
                 ElevatedButton.icon(
